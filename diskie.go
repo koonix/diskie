@@ -20,6 +20,7 @@ type BlockDevice struct {
 	DeviceNumber          *uint64
 	Id                    *string
 	Size                  *uint64
+	PreferredSize         *uint64
 	ReadOnly              *bool
 	Drive                 *Drive
 	IdUsage               *string
@@ -228,6 +229,15 @@ func (c *Conn) BlockDevices() (*BlockMap, error) {
 			return nil, fmt.Errorf("could not get filesystem: %w", err)
 		}
 		block.Filesystem = fs
+
+		// BlockDevice.PreferredSize
+		if fs != nil && fs.Size != nil && *fs.Size != 0 {
+			block.PreferredSize = fs.Size
+		} else if partition != nil && partition.Size != nil && *partition.Size != 0 {
+			block.PreferredSize = partition.Size
+		} else {
+			block.PreferredSize = block.Size
+		}
 
 		blockmap[block.ObjectPath] = &block
 	}

@@ -61,18 +61,11 @@ func (bm *BlockMap) Sort() []*BlockDevice {
 		}
 
 		getSize := func(block *BlockDevice) uint64 {
-			f := block.Filesystem
-			if f != nil && f.Size != nil && *f.Size != 0 {
-				return *f.Size
+			if block.PreferredSize != nil {
+				return *block.PreferredSize
+			} else {
+				return 0
 			}
-			p := block.Partition
-			if p != nil && p.Size != nil && *p.Size != 0 {
-				return *p.Size
-			}
-			if block.Size != nil {
-				return *block.Size
-			}
-			return 0
 		}
 
 		x := getSortKey(a)
