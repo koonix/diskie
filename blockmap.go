@@ -2,6 +2,7 @@ package diskie
 
 import (
 	"cmp"
+	"fmt"
 	"slices"
 )
 
@@ -9,7 +10,11 @@ type BlockMap struct {
 	BlockMap map[string]*BlockDevice
 }
 
-func (bm *BlockMap) Filter(blocks []*BlockDevice, minImportance uint) []*BlockDevice {
+func (bm *BlockMap) Filter(blocks []*BlockDevice, minImportance uint) ([]*BlockDevice, error) {
+	if minImportance > 3 {
+		return nil, fmt.Errorf("minImportance of %d is out of the possible range of 0 through 3", minImportance)
+	}
+
 	filtered := make([]*BlockDevice, 0, len(blocks))
 
 	importance := func(b *BlockDevice) uint {
@@ -40,7 +45,7 @@ func (bm *BlockMap) Filter(blocks []*BlockDevice, minImportance uint) []*BlockDe
 		}
 	}
 
-	return filtered
+	return filtered, nil
 }
 
 func (bm *BlockMap) Sort() []*BlockDevice {
