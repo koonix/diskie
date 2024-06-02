@@ -39,6 +39,7 @@ type BlockDevice struct {
 	UserspaceMountOptions *[]string
 	Partition             *Partition
 	Filesystem            *Filesystem
+	Encrypted             *Encrypted
 }
 
 type Drive struct {
@@ -87,6 +88,12 @@ type Partition struct {
 type Filesystem struct {
 	MountPoints *[]string
 	Size        *uint64
+}
+
+type Encrypted struct {
+	HintEncryptionType *string
+	MetadataSize       *uint64
+	CleartextDevice    *string
 }
 
 func Connect() (*Conn, error) {
@@ -212,21 +219,21 @@ func (c *Conn) BlockDevices() (*BlockMap, error) {
 		}
 		drive, err := c.getDrive(drivePath)
 		if err != nil {
-			return nil, fmt.Errorf("could not get drive: %w", err)
+			return nil, fmt.Errorf("could not get BlockDevice.Drive: %w", err)
 		}
 		block.Drive = drive
 
 		// BlockDevice.Partition
 		partition, err := getPartition(obj)
 		if err != nil {
-			return nil, fmt.Errorf("could not get partition: %w", err)
+			return nil, fmt.Errorf("could not get BlockDevice.Partition: %w", err)
 		}
 		block.Partition = partition
 
 		// BlockDevice.Filesystem
 		fs, err := getFilesystem(obj)
 		if err != nil {
-			return nil, fmt.Errorf("could not get filesystem: %w", err)
+			return nil, fmt.Errorf("could not get BlockDevice.Filesystem: %w", err)
 		}
 		block.Filesystem = fs
 
@@ -238,6 +245,13 @@ func (c *Conn) BlockDevices() (*BlockMap, error) {
 		} else {
 			block.PreferredSize = block.Size
 		}
+
+		// BlockDevice.Encrypted
+		enc, err := getEncrypted(obj)
+		if err != nil {
+			return nil, fmt.Errorf("could not get BlockDevic.Encrypted: %w", err)
+		}
+		block.Encrypted = enc
 
 		blockmap[block.ObjectPath] = &block
 	}
@@ -354,6 +368,38 @@ func (c *Conn) getDrive(path dbus.ObjectPath) (*Drive, error) {
 	}
 
 	return &drive, nil
+}
+
+func getEncrypted(obj dbus.BusObject) (*Encrypted, error) {
+	property := "org.freedesktop.UDisks2.Encrypted"
+
+	var store map[string]dbus.Variant
+
+	err := obj.Call("org.freedesktop.DBus.Properties.GetAll", 0, property).Store(&store)
+
+	if err != nil && strings.Contains(err.Error(), "No such interface") {
+		return nil, nil
+	} else if err != nil {
+		return nil, fmt.Errorf("could not get property %s: %w", property, err)
+	}
+
+	var enc Encrypted
+
+	for k, v := range store {
+		switch k {
+		case "HintEncryptionType":
+			val := v.Value().(string)
+			enc.HintEncryptionType = &val
+		case "MetadataSize":
+			val := v.Value().(uint64)
+			enc.MetadataSize = &val
+		case "CleartextDevice":
+			val := string(v.Value().(dbus.ObjectPath))
+			enc.CleartextDevice = &val
+		}
+	}
+
+	return &enc, nil
 }
 
 func getFilesystem(obj dbus.BusObject) (*Filesystem, error) {
