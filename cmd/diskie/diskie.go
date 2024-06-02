@@ -25,7 +25,7 @@ var defaultFormat = `
 	( .IdType  | derefStr | default "-" | abbrev 15 )
 	( .IdLabel | derefStr | default "-" | abbrev 15 )
 }}
-{{ with .Drive }}
+{{ with .RootDrive }}
    {{ .Model | derefStr | default "-" | compact }}
 {{ else }}
    -
@@ -51,14 +51,20 @@ func main() {
 						Value: 0,
 						Usage: "Only include block devices more important than the given level. Possible values are 0 through 3.",
 					},
+					&cli.StringFlag{
+						Name:  "json-type",
+						Value: "array",
+						Usage: `Type of the JSON output. Can be "array" or "object".`,
+					},
 				},
 				Action: func(c *cli.Context) error {
 					f := c.String("format")
+					t := c.String("json-type")
 					i := c.Uint("min-importance")
 					if i > 3 {
 						return fmt.Errorf("min-importance of %d is out of the possible range of 0 through 3", i)
 					}
-					return cmdBlockdevs(f, i)
+					return cmdBlockdevs(f, t, i)
 				},
 			},
 			{
@@ -101,17 +107,28 @@ func main() {
 	}
 }
 
-func cmdBlockdevs(format string, importance uint) error {
-	blocks, err := blocks(importance)
+func cmdBlockdevs(format string, jsonType string, importance uint) error {
+	blocks, blockmap, err := blocks(importance)
 	if err != nil {
 		return err
 	}
 
 	if format == "json" {
-		pretty, err := prettyJson(blocks)
+		var v any
+
+		if jsonType == "array" {
+			v = blocks
+		} else if jsonType == "object" {
+			v = blockmap
+		} else {
+			return fmt.Errorf("unknown jsonType: %s", jsonType)
+		}
+
+		pretty, err := prettyJson(v)
 		if err != nil {
 			return err
 		}
+
 		fmt.Println(string(pretty))
 		return nil
 	}
@@ -130,7 +147,7 @@ func cmdBlockdevs(format string, importance uint) error {
 }
 
 func cmdMenu(format string, importance uint, menuCmd string, menuArgs []string) error {
-	blocks, err := blocks(importance)
+	blocks, _, err := blocks(importance)
 	if err != nil {
 		return err
 	}
@@ -252,24 +269,25 @@ func deref[T any](v *T) T {
 	}
 }
 
-func blocks(importance uint) ([]*diskie.BlockDevice, error) {
+func blocks(importance uint) (
+	[]*diskie.BlockDevice, map[string]*diskie.BlockDevice, error) {
 	dsk, err := diskie.Connect()
 	if err != nil {
-		return nil, fmt.Errorf("could not create diskie client: %w", err)
+		return nil, nil, fmt.Errorf("could not create diskie client: %w", err)
 	}
 
 	blockmap, err := dsk.BlockDevices()
 	if err != nil {
-		return nil, fmt.Errorf("could not get block devices: %w", err)
+		return nil, nil, fmt.Errorf("could not get block devices: %w", err)
 	}
 
 	blocks := blockmap.Sort()
 	blocks, err = blockmap.Filter(blocks, importance)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return blocks, nil
+	return blocks, blockmap.BlockMap, nil
 }
 
 func prettyJson(obj interface{}) ([]byte, error) {
