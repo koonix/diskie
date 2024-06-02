@@ -62,8 +62,9 @@ func main() {
 				},
 			},
 			{
-				Name:  "menu",
-				Usage: "Mount or unmount devices using dmenu",
+				Name:      "menu",
+				Usage:     "Mount or unmount devices using a dmenu-compatible program",
+				UsageText: "menu [command options] cmd [arguments...]",
 				Flags: []cli.Flag{
 					&cli.StringFlag{
 						Name:  "format",
@@ -85,7 +86,7 @@ func main() {
 						return fmt.Errorf("min-importance of %d is out of the possible range of 0 through 3", i)
 					}
 					if menuCmd == "" && len(menuArgs) == 0 {
-						menuCmd = "dmenu"
+						return fmt.Errorf("please provide a dmenu-compatible program as the arguments to this command (eg. `diskie menu dmenu -p Diskie`)")
 					}
 					return cmdMenu(f, i, menuCmd, menuArgs)
 				},
