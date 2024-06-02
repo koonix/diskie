@@ -30,7 +30,7 @@ func (bm *BlockMap) Filter(blocks []*BlockDevice, minImportance uint) ([]*BlockD
 		if b.HintSystem != nil && *b.HintSystem {
 			return 2
 		}
-		d := bm.getDrive(b)
+		d := b.RootDrive
 		if d != nil && d.MediaAvailable != nil {
 			if !*d.MediaAvailable {
 				return 2
@@ -56,46 +56,38 @@ func (bm *BlockMap) Sort() []*BlockDevice {
 	}
 
 	slices.SortStableFunc(blocks, func(a, b *BlockDevice) int {
-
 		getSortKey := func(b *BlockDevice) string {
-			d := bm.getDrive(b)
+			sortKey := "000"
+			d := b.RootDrive
 			if d != nil && d.SortKey != nil {
-				return *d.SortKey
+				sortKey = *d.SortKey
 			}
-			return "99"
-		}
 
-		getSize := func(block *BlockDevice) uint64 {
-			if block.PreferredSize != nil {
-				return *block.PreferredSize
-			} else {
-				return 0
+			rootSize := uint64(0)
+			s := bm.BlockMap[b.RootDevice].PreferredSize
+			if s != nil {
+				rootSize = *s
 			}
+
+			usage := "00other"
+			if b.IdUsage != nil {
+				if *b.IdUsage == "filesystem" {
+					usage = "02filesystem"
+				} else if *b.IdUsage == "crypto" {
+					usage = "01crypto"
+				}
+			}
+
+			size := uint64(0)
+			if b.PreferredSize != nil {
+				size = *b.PreferredSize
+			}
+
+			return fmt.Sprintf("%s/%030d/%s/%030d", sortKey, rootSize, usage, size)
 		}
 
-		x := getSortKey(a)
-		y := getSortKey(b)
-
-		if x == y {
-			return cmp.Compare(getSize(b), getSize(a))
-		} else {
-			return cmp.Compare(y, x)
-		}
+		return cmp.Compare(getSortKey(b), getSortKey(a))
 	})
 
 	return blocks
-}
-
-func (bm *BlockMap) getDrive(block *BlockDevice) *Drive {
-	if block.Drive != nil {
-		return block.Drive
-	}
-	c := block.CryptoBackingDevice
-	if c != nil && *c != "/" {
-		b, has := bm.BlockMap[*c]
-		if has {
-			return bm.getDrive(b)
-		}
-	}
-	return nil
 }
