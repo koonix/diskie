@@ -20,7 +20,6 @@ type BlockDevice struct {
 	DeviceNumber          *uint64
 	Id                    *string
 	Size                  *uint64
-	PreferredSize         *uint64
 	ReadOnly              *bool
 	Drive                 *Drive
 	IdUsage               *string
@@ -40,6 +39,11 @@ type BlockDevice struct {
 	Partition             *Partition
 	Filesystem            *Filesystem
 	Encrypted             *Encrypted
+
+	// custom attributes
+	RootDrive     *Drive
+	RootDevice    string
+	PreferredSize *uint64
 }
 
 type Drive struct {
@@ -254,6 +258,43 @@ func (c *Conn) BlockDevices() (*BlockMap, error) {
 		block.Encrypted = enc
 
 		blockmap[block.ObjectPath] = &block
+	}
+
+	// BlockDevice.RootDrive
+	var getRootDrive func(*BlockDevice) *Drive
+	getRootDrive = func(b *BlockDevice) *Drive {
+		if b.Drive != nil {
+			return b.Drive
+		}
+		c := b.CryptoBackingDevice
+		if c == nil || *c == "/" {
+			return nil
+		}
+		b, has := blockmap[*c]
+		if has {
+			return getRootDrive(b)
+		}
+		panic(fmt.Errorf("CryptoBackingDevice not found in the list of devices: %s", *c))
+	}
+	for _, b := range blockmap {
+		b.RootDrive = getRootDrive(b)
+	}
+
+	// BlockDevice.RootBackingDevice
+	var getRootDevice func(*BlockDevice) string
+	getRootDevice = func(b *BlockDevice) string {
+		c := b.CryptoBackingDevice
+		if c == nil || *c == "/" {
+			return b.ObjectPath
+		}
+		b, has := blockmap[*c]
+		if has {
+			return getRootDevice(b)
+		}
+		panic(fmt.Errorf("CryptoBackingDevice not found in the list of devices: %s", *c))
+	}
+	for _, b := range blockmap {
+		b.RootDevice = getRootDevice(b)
 	}
 
 	return &BlockMap{
