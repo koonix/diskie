@@ -40,7 +40,8 @@ type BlockDevice struct {
 	Filesystem            *Filesystem
 	Encrypted             *Encrypted
 
-	// custom attributes
+	// convenient diskie-specific attributes
+
 	RootDrive     *Drive
 	RootDevice    string
 	PreferredSize *uint64
