@@ -39,7 +39,7 @@ func main() {
 		Commands: []cli.Command{
 			{
 				Name:  "blockdevs",
-				Usage: "Print block devices",
+				Usage: "Print block devices.",
 				Flags: []cli.Flag{
 					&cli.StringFlag{
 						Name:  "format",
@@ -69,7 +69,7 @@ func main() {
 			},
 			{
 				Name:      "menu",
-				Usage:     "Mount or unmount devices using a dmenu-compatible program",
+				Usage:     "Mount or unmount devices using a dmenu-compatible program.",
 				UsageText: "menu [command options] cmd [arguments...]",
 				Flags: []cli.Flag{
 					&cli.StringFlag{
