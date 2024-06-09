@@ -82,19 +82,25 @@ func main() {
 						Value: 0,
 						Usage: "Only include block devices more important than the given level. Possible values are 0 through 3.",
 					},
+					&cli.StringFlag{
+						Name:  "max-lines",
+						Value: "0",
+						Usage: "Limit the maximum value of the %l sequence. Zero means no limit.",
+					},
 				},
 				Action: func(c *cli.Context) error {
 					menuCmd := c.Args().First()
 					menuArgs := c.Args().Tail()
 					f := c.String("format")
 					i := c.Uint("min-importance")
+					l := c.Uint("max-lines")
 					if i > 3 {
 						return fmt.Errorf("min-importance of %d is out of the possible range of 0 through 3", i)
 					}
 					if menuCmd == "" && len(menuArgs) == 0 {
 						return fmt.Errorf("please provide a dmenu-compatible program as the arguments to this command (eg. `diskie menu dmenu -p Diskie`)")
 					}
-					return cmdMenu(f, i, menuCmd, menuArgs)
+					return cmdMenu(f, i, l, menuCmd, menuArgs)
 				},
 			},
 		},
@@ -146,7 +152,7 @@ func cmdBlockdevs(format string, jsonType string, importance uint) error {
 	return nil
 }
 
-func cmdMenu(format string, importance uint, menuCmd string, menuArgs []string) error {
+func cmdMenu(format string, importance uint, maxlines uint, menuCmd string, menuArgs []string) error {
 	blocks, _, err := blocks(importance)
 	if err != nil {
 		return err
@@ -159,6 +165,15 @@ func cmdMenu(format string, importance uint, menuCmd string, menuArgs []string) 
 	formattedSlice, formattedMap, err := formatBlocks(blocks, format, true)
 	if err != nil {
 		return err
+	}
+
+	lines := uint(len(formattedSlice))
+	if maxlines > 0 {
+		lines = max(lines, maxlines)
+	}
+	linesStr := fmt.Sprint(lines)
+	for i := 0; i < len(menuArgs); i++ {
+		menuArgs[i] = strings.ReplaceAll(menuArgs[i], "%l", linesStr)
 	}
 
 	cmd := exec.Command(menuCmd, menuArgs...)
