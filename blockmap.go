@@ -30,7 +30,7 @@ func (bm *BlockMap) Filter(blocks []*BlockDevice, minImportance uint) ([]*BlockD
 		if b.HintSystem != nil && *b.HintSystem {
 			return 2
 		}
-		d := b.RootDrive
+		d := b.CryptoRootDrive
 		if d != nil && d.MediaAvailable != nil {
 			if !*d.MediaAvailable {
 				return 2
@@ -58,13 +58,13 @@ func (bm *BlockMap) Sort() []*BlockDevice {
 	slices.SortStableFunc(blocks, func(a, b *BlockDevice) int {
 		getSortKey := func(b *BlockDevice) string {
 			sortKey := "000"
-			d := b.RootDrive
+			d := b.CryptoRootDrive
 			if d != nil && d.SortKey != nil {
 				sortKey = *d.SortKey
 			}
 
 			rootSize := uint64(0)
-			s := bm.BlockMap[b.RootDevice].PreferredSize
+			s := bm.BlockMap[b.CryptoRootDevice].PreferredSize
 			if s != nil {
 				rootSize = *s
 			}
