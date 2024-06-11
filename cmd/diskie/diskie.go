@@ -44,7 +44,7 @@ func main() {
 					&cli.StringFlag{
 						Name:  "format",
 						Value: "json",
-						Usage: `Output format. Can be "json", "default", or a golang template.`,
+						Usage: `Output format. Can be "json", "default", or path to a file containing a golang template.`,
 					},
 					&cli.UintFlag{
 						Name:  "min-importance",
@@ -75,7 +75,7 @@ func main() {
 					&cli.StringFlag{
 						Name:  "format",
 						Value: "default",
-						Usage: `Output format. Can be "default" or a golang template.`,
+						Usage: `Output format. Can be "default" or path to a file containing a golang template.`,
 					},
 					&cli.UintFlag{
 						Name:  "min-importance",
@@ -137,10 +137,14 @@ func cmdBlockdevs(format string, jsonType string, importance uint) error {
 
 		fmt.Println(string(pretty))
 		return nil
-	}
-
-	if format == "default" {
+	} else if format == "default" {
 		format = defaultFormat
+	} else {
+		f, err := os.ReadFile(format)
+		if err != nil {
+			return fmt.Errorf("could not read the format file: %w", err)
+		}
+		format = string(f)
 	}
 
 	formattedSlice, _, err := formatBlocks(blocks, format, false)
@@ -160,6 +164,12 @@ func cmdMenu(format string, importance uint, maxlines uint, menuCmd string, menu
 
 	if format == "default" {
 		format = defaultFormat
+	} else {
+		f, err := os.ReadFile(format)
+		if err != nil {
+			return fmt.Errorf("could not read the format file: %w", err)
+		}
+		format = string(f)
 	}
 
 	formattedSlice, formattedMap, err := formatBlocks(blocks, format, true)
