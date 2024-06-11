@@ -8,29 +8,12 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"regexp"
 	"strings"
 	"text/template"
 
 	"github.com/Masterminds/sprig/v3"
-	"github.com/dustin/go-humanize"
 	"github.com/urfave/cli"
 )
-
-var defaultFormat = `
-{{
-	printf "%-10s   %7s   %-15s   %-15s"
-	( .Device | derefStr )
-	( .PreferredSize | humanBytesIEC )
-	( .IdType  | derefStr | default "-" | abbrev 15 )
-	( .IdLabel | derefStr | default "-" | abbrev 15 )
-}}
-{{ with .RootDrive }}
-   {{ .Model | derefStr | default "-" | compact }}
-{{ else }}
-   -
-{{ end }}
-`
 
 func main() {
 	app := &cli.App{
@@ -44,7 +27,7 @@ func main() {
 					&cli.StringFlag{
 						Name:  "format",
 						Value: "json",
-						Usage: `Output format. Can be "json", "default", or path to a file containing a golang template.`,
+						Usage: `Output format. Can be "json", "tabular", "basic", "rofi-markup" or path to a file containing a golang template.`,
 					},
 					&cli.UintFlag{
 						Name:  "min-importance",
@@ -75,7 +58,7 @@ func main() {
 					&cli.StringFlag{
 						Name:  "format",
 						Value: "default",
-						Usage: `Output format. Can be "default" or path to a file containing a golang template.`,
+						Usage: `Output format. Can be "tabular", "basic", "rofi-markup" or path to a file containing a golang template.`,
 					},
 					&cli.UintFlag{
 						Name:  "min-importance",
@@ -137,8 +120,12 @@ func cmdBlockdevs(format string, jsonType string, importance uint) error {
 
 		fmt.Println(string(pretty))
 		return nil
-	} else if format == "default" {
-		format = defaultFormat
+	} else if format == "tabular" {
+		format = formatTabular
+	} else if format == "basic" {
+		format = formatBasic
+	} else if format == "rofi-markup" {
+		format = formatRofiMarkup
 	} else {
 		f, err := os.ReadFile(format)
 		if err != nil {
@@ -162,8 +149,12 @@ func cmdMenu(format string, importance uint, maxlines uint, menuCmd string, menu
 		return err
 	}
 
-	if format == "default" {
-		format = defaultFormat
+	if format == "tabular" {
+		format = formatTabular
+	} else if format == "basic" {
+		format = formatBasic
+	} else if format == "rofi-markup" {
+		format = formatRofiMarkup
 	} else {
 		f, err := os.ReadFile(format)
 		if err != nil {
@@ -179,7 +170,7 @@ func cmdMenu(format string, importance uint, maxlines uint, menuCmd string, menu
 
 	lines := uint(len(formattedSlice))
 	if maxlines > 0 {
-		lines = max(lines, maxlines)
+		lines = min(lines, maxlines)
 	}
 	linesStr := fmt.Sprint(lines)
 	for i := 0; i < len(menuArgs); i++ {
@@ -187,6 +178,10 @@ func cmdMenu(format string, importance uint, maxlines uint, menuCmd string, menu
 	}
 
 	cmd := exec.Command(menuCmd, menuArgs...)
+
+	// connect the command's stderr to the terminal.
+	// this is required for something like fzf to work.
+	cmd.Stderr = os.Stderr
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -238,23 +233,7 @@ func formatBlocks(
 	blocks []*diskie.BlockDevice, format string, catchDuplicate bool) (
 	[]string, map[string]*diskie.BlockDevice, error) {
 
-	funcs := template.FuncMap{
-		"derefStr": deref[string],
-		"derefU32": deref[uint32],
-		"derefU64": deref[uint64],
-		"compact": func(v string) string {
-			return regexp.MustCompile(`\s+`).ReplaceAllString(v, " ")
-		},
-		"humanBytes": func(v uint64) string {
-			return humanize.Bytes(v)
-		},
-		"humanBytesIEC": func(v uint64) string {
-			return humanize.IBytes(v)
-		},
-	}
-
-	tmpl, err := template.New("format").
-		Funcs(sprig.FuncMap()).Funcs(funcs).Parse(format)
+	tmpl, err := template.New("format").Funcs(sprig.FuncMap()).Funcs(templateFuncs).Parse(format)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not parse the template: %w", err)
 	}
@@ -283,15 +262,6 @@ func formatBlocks(
 	}
 
 	return formattedSlice, formattedMap, nil
-}
-
-func deref[T any](v *T) T {
-	if v != nil {
-		return *v
-	} else {
-		var v T
-		return v
-	}
 }
 
 func blocks(importance uint) (
