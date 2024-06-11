@@ -42,6 +42,11 @@ type BlockDevice struct {
 
 	// convenient diskie-specific attributes
 
+	DriveVendor         string
+	DriveModel          string
+	DriveRevision       string
+	DriveSerial         string
+	DriveId             string
 	PreferredSize       *uint64
 	CryptoRootDrive     *Drive
 	CryptoRootDevice    string
@@ -314,6 +319,45 @@ func (c *Conn) BlockDevices() (*BlockMap, error) {
 	}
 	for _, b := range blockmap {
 		b.CryptoClosingDevice = getClosingDevice(b)
+	}
+
+	for _, b := range blockmap {
+		d := b.CryptoRootDrive
+
+		// BlockDevice.DriveVendor
+		if d != nil && d.Vendor != nil {
+			b.DriveVendor = *d.Vendor
+		} else {
+			b.DriveVendor = ""
+		}
+
+		// BlockDevice.DriveModel
+		if d != nil && d.Model != nil {
+			b.DriveModel = *d.Model
+		} else {
+			b.DriveModel = ""
+		}
+
+		// BlockDevice.DriveRevision
+		if d != nil && d.Revision != nil {
+			b.DriveRevision = *d.Revision
+		} else {
+			b.DriveRevision = ""
+		}
+
+		// BlockDevice.DriveSerial
+		if d != nil && d.Serial != nil {
+			b.DriveSerial = *d.Serial
+		} else {
+			b.DriveSerial = ""
+		}
+
+		// BlockDevice.DriveId
+		if d != nil && d.Id != nil {
+			b.DriveId = *d.Id
+		} else {
+			b.DriveId = ""
+		}
 	}
 
 	return &BlockMap{
